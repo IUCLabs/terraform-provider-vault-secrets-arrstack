@@ -8,18 +8,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func listOf(t *testing.T, vals ...string) types.List {
+func setOf(t *testing.T, vals ...string) types.Set {
 	t.Helper()
-	l, diags := types.ListValueFrom(context.Background(), types.StringType, vals)
+	s, diags := types.SetValueFrom(context.Background(), types.StringType, vals)
 	if diags.HasError() {
-		t.Fatalf("building list: %v", diags)
+		t.Fatalf("building set: %v", diags)
 	}
-	return l
+	return s
 }
 
 func TestRoleDataOmitsUnsetTTLs(t *testing.T) {
 	m := secretBackendRoleModel{
-		Apps:   listOf(t, "sonarr", "radarr", "prowlarr"),
+		Apps:   setOf(t, "sonarr", "radarr", "prowlarr"),
 		TTL:    types.Int64Null(),
 		MaxTTL: types.Int64Null(),
 	}
@@ -41,7 +41,7 @@ func TestRoleDataOmitsUnsetTTLs(t *testing.T) {
 
 func TestRoleDataIncludesTTLs(t *testing.T) {
 	m := secretBackendRoleModel{
-		Apps:   listOf(t, "prowlarr"),
+		Apps:   setOf(t, "prowlarr"),
 		TTL:    types.Int64Value(60),
 		MaxTTL: types.Int64Value(86400),
 	}
@@ -70,13 +70,31 @@ func TestApplyRoleDataMapsEngineResponse(t *testing.T) {
 	if diags := applyRoleData(&m, role); diags.HasError() {
 		t.Fatalf("applyRoleData: %v", diags)
 	}
-	var apps []string
-	m.Apps.ElementsAs(context.Background(), &apps, false)
-	if len(apps) != 3 || apps[2] != "prowlarr" {
-		t.Errorf("apps = %v, want [sonarr radarr prowlarr]", apps)
+	if !m.Apps.Equal(setOf(t, "sonarr", "radarr", "prowlarr")) {
+		t.Errorf("apps = %v, want {sonarr radarr prowlarr}", m.Apps)
 	}
 	if m.TTL.ValueInt64() != 60 || m.MaxTTL.ValueInt64() != 86400 {
 		t.Errorf("ttl/max_ttl = %d/%d, want 60/86400", m.TTL.ValueInt64(), m.MaxTTL.ValueInt64())
+	}
+}
+
+func TestApplyRoleDataOrderInsensitive(t *testing.T) {
+	// The engine returns apps alphabetically sorted regardless of the order
+	// they were written in; the read-back must still equal the config value.
+	configApps := setOf(t, "sonarr", "prowlarr", "radarr")
+	role := map[string]interface{}{
+		"apps": []interface{}{"prowlarr", "radarr", "sonarr"},
+	}
+	m := secretBackendRoleModel{
+		Apps:   configApps,
+		TTL:    types.Int64Null(),
+		MaxTTL: types.Int64Null(),
+	}
+	if diags := applyRoleData(&m, role); diags.HasError() {
+		t.Fatalf("applyRoleData: %v", diags)
+	}
+	if !m.Apps.Equal(configApps) {
+		t.Errorf("apps after read-back = %v, not equal to config value %v", m.Apps, configApps)
 	}
 }
 

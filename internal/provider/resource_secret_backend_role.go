@@ -25,7 +25,7 @@ type secretBackendRoleResource struct {
 type secretBackendRoleModel struct {
 	Backend types.String `tfsdk:"backend"`
 	Name    types.String `tfsdk:"name"`
-	Apps    types.List   `tfsdk:"apps"`
+	Apps    types.Set    `tfsdk:"apps"`
 	TTL     types.Int64  `tfsdk:"ttl"`
 	MaxTTL  types.Int64  `tfsdk:"max_ttl"`
 }
@@ -56,7 +56,7 @@ func (r *secretBackendRoleResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"apps": schema.ListAttribute{
+			"apps": schema.SetAttribute{
 				Description: "arr apps a generated key may access (subset of sonarr, radarr, prowlarr).",
 				ElementType: types.StringType,
 				Required:    true,
@@ -212,9 +212,9 @@ func applyRoleData(m *secretBackendRoleModel, role map[string]interface{}) diag.
 	var diags diag.Diagnostics
 
 	apps := toStringSlice(role["apps"])
-	appList, appDiags := types.ListValueFrom(context.Background(), types.StringType, apps)
+	appSet, appDiags := types.SetValueFrom(context.Background(), types.StringType, apps)
 	diags.Append(appDiags...)
-	m.Apps = appList
+	m.Apps = appSet
 
 	if n, ok := toInt64(role["ttl"]); ok && n != 0 {
 		m.TTL = types.Int64Value(n)

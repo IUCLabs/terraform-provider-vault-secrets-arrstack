@@ -39,3 +39,13 @@ resource "arrstack_secret_backend_role" "prowlarr" {
   ttl     = 60
   max_ttl = 86400
 }
+
+# Role scoped to read-only traffic across all three apps.
+resource "arrstack_secret_backend_role" "readonly" {
+  backend = arrstack_secret_backend.arrstack.path
+  name    = "readonly"
+  apps    = ["sonarr", "radarr", "prowlarr"]
+  methods = ["GET", "HEAD"]
+  ttl     = 60
+  max_ttl = 86400
+}

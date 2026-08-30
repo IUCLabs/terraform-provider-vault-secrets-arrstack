@@ -14,7 +14,7 @@ Source address: `artifactapi.k8s.syd1.au.unkin.net/terraform-unkin/vault-secrets
 | Resource | Manages |
 |----------|---------|
 | `arrstack_secret_backend` | Mounts the engine at a path and writes its `config` (arrproxy base URL, request timeout, seeded admin token, optional CA cert). |
-| `arrstack_secret_backend_role` | A role: `apps` (subset of sonarr/radarr/prowlarr), `ttl`, `max_ttl`. |
+| `arrstack_secret_backend_role` | A role: `apps` (subset of sonarr/radarr/prowlarr), optional `methods` (HTTP method scope), `ttl`, `max_ttl`. |
 
 ## Usage
 
@@ -45,6 +45,16 @@ resource "arrstack_secret_backend_role" "all" {
   ttl     = 60
   max_ttl = 86400
 }
+
+# Read-only role: keys minted from it may only issue GET/HEAD.
+resource "arrstack_secret_backend_role" "sonarr_ro" {
+  backend = arrstack_secret_backend.arrstack.path
+  name    = "sonarr-ro"
+  apps    = ["sonarr"]
+  methods = ["GET", "HEAD"]
+  ttl     = 60
+  max_ttl = 86400
+}
 ```
 
 ### Notes
@@ -55,6 +65,12 @@ resource "arrstack_secret_backend_role" "all" {
 - Writing `config` makes the engine authenticate against arrproxy as an admin,
   so a bad URL or token fails the apply.
 - `apps` is required; entries must be a subset of `sonarr`, `radarr`, `prowlarr`.
+- `methods` is optional and restricts a minted key to those HTTP methods;
+  omitting it (or setting `[]`) leaves the key unrestricted. Entries must be
+  upper case and a subset of `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`,
+  `OPTIONS` — the engine stores them upper-cased, so a lower-case value would
+  show permanent drift and is rejected at plan time. Requires engine plugin
+  `vault-plugin-secrets-arrstack` >= 0.2.0.
 
 ## Import
 

@@ -4,14 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// validMethods mirrors the engine's knownMethods; the engine normalises to
+// upper case, so only the upper-case spelling round-trips without drift.
+var validMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 
 var (
 	_ resource.Resource                = &secretBackendRoleResource{}
@@ -26,6 +33,7 @@ type secretBackendRoleModel struct {
 	Backend types.String `tfsdk:"backend"`
 	Name    types.String `tfsdk:"name"`
 	Apps    types.Set    `tfsdk:"apps"`
+	Methods types.Set    `tfsdk:"methods"`
 	TTL     types.Int64  `tfsdk:"ttl"`
 	MaxTTL  types.Int64  `tfsdk:"max_ttl"`
 }
@@ -60,6 +68,14 @@ func (r *secretBackendRoleResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: "arr apps a generated key may access (subset of sonarr, radarr, prowlarr).",
 				ElementType: types.StringType,
 				Required:    true,
+			},
+			"methods": schema.SetAttribute{
+				Description: "HTTP methods a generated key is limited to (subset of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS). Omit or leave empty for unrestricted.",
+				ElementType: types.StringType,
+				Optional:    true,
+				Validators: []validator.Set{
+					setvalidator.ValueStringsAre(stringvalidator.OneOf(validMethods...)),
+				},
 			},
 			"ttl": schema.Int64Attribute{
 				Description: "Default lease TTL in seconds for keys generated from this role.",
@@ -199,6 +215,14 @@ func roleData(ctx context.Context, m secretBackendRoleModel) (map[string]interfa
 		diags.Append(m.Apps.ElementsAs(ctx, &apps, false)...)
 		data["apps"] = apps
 	}
+	// Always sent: the engine only clears a method scope when the key is
+	// present, so an omitted key would leave a previous scope in place.
+	methods := []string{}
+	if !m.Methods.IsNull() && !m.Methods.IsUnknown() {
+		diags.Append(m.Methods.ElementsAs(ctx, &methods, false)...)
+	}
+	data["methods"] = methods
+
 	if !m.TTL.IsNull() && !m.TTL.IsUnknown() {
 		data["ttl"] = m.TTL.ValueInt64()
 	}
@@ -215,6 +239,17 @@ func applyRoleData(m *secretBackendRoleModel, role map[string]interface{}) diag.
 	appSet, appDiags := types.SetValueFrom(context.Background(), types.StringType, apps)
 	diags.Append(appDiags...)
 	m.Apps = appSet
+
+	// An unrestricted role reads back as an empty list; keep that as null so a
+	// config that omits methods does not drift against an empty set.
+	methods := toStringSlice(role["methods"])
+	if len(methods) == 0 && (m.Methods.IsNull() || m.Methods.IsUnknown()) {
+		m.Methods = types.SetNull(types.StringType)
+	} else {
+		methodSet, methodDiags := types.SetValueFrom(context.Background(), types.StringType, methods)
+		diags.Append(methodDiags...)
+		m.Methods = methodSet
+	}
 
 	if n, ok := toInt64(role["ttl"]); ok && n != 0 {
 		m.TTL = types.Int64Value(n)

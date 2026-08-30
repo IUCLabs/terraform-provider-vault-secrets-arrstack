@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
+	github.com/hashicorp/terraform-plugin-framework-validators v0.16.0
 	github.com/hashicorp/vault/api v1.15.0
 )
 

@@ -22,8 +22,6 @@ var (
 
 const defaultPluginType = "vault-plugin-secrets-arrstack"
 
-const defaultBaseURL = "https://arrstack.unkin.net"
-
 type secretBackendResource struct {
 	client *vaultClient
 }
@@ -48,7 +46,7 @@ func (r *secretBackendResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *secretBackendResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Mounts the arrstack secrets engine and writes its connection config and seeded arrproxy admin token.",
+		Description: "Mounts the arrstack secrets engine and writes its config: the arrproxy base URL and admin token.",
 		Attributes: map[string]schema.Attribute{
 			"path": schema.StringAttribute{
 				Description: "Mount path for the arrstack secrets engine (e.g. \"arrstack\").",
@@ -58,7 +56,7 @@ func (r *secretBackendResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"plugin": schema.StringAttribute{
-				Description: "Registered plugin name/type to mount.",
+				Description: "Name of the plugin in the catalog to mount. Defaults to vault-plugin-secrets-arrstack.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(defaultPluginType),
@@ -73,10 +71,8 @@ func (r *secretBackendResource) Schema(_ context.Context, _ resource.SchemaReque
 				Default:     stringdefault.StaticString(""),
 			},
 			"base_url": schema.StringAttribute{
-				Description: "Base URL of the arrproxy front door (e.g. https://arrstack.unkin.net).",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(defaultBaseURL),
+				Description: "Base URL of the arrproxy deployment (e.g. https://arrproxy.example.com).",
+				Required:    true,
 			},
 			"admin_token": schema.StringAttribute{
 				Description: "arrproxy admin token the engine authenticates with. Write-only; never read back.",
@@ -89,7 +85,7 @@ func (r *secretBackendResource) Schema(_ context.Context, _ resource.SchemaReque
 				Sensitive:   true,
 			},
 			"request_timeout_seconds": schema.Int64Attribute{
-				Description: "HTTP timeout in seconds for calls from the plugin to arrproxy.",
+				Description: "HTTP timeout in seconds for calls from the engine to arrproxy. Defaults to 30.",
 				Optional:    true,
 				Computed:    true,
 				Default:     int64default.StaticInt64(30),

@@ -48,7 +48,7 @@ func (r *secretBackendRoleResource) Metadata(_ context.Context, req resource.Met
 
 func (r *secretBackendRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a role on the arrstack secrets engine that mints short-lived scoped arrproxy API keys.",
+		Description: "Manages a role on the arrstack secrets engine that mints short-lived, scoped arrproxy machine tokens.",
 		Attributes: map[string]schema.Attribute{
 			"backend": schema.StringAttribute{
 				Description: "Mount path of the arrstack secrets engine.",
@@ -65,12 +65,12 @@ func (r *secretBackendRoleResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"apps": schema.SetAttribute{
-				Description: "arr apps a generated key may access (subset of sonarr, radarr, prowlarr).",
+				Description: "Apps a minted token may reach (non-empty subset of sonarr, radarr, prowlarr).",
 				ElementType: types.StringType,
 				Required:    true,
 			},
 			"methods": schema.SetAttribute{
-				Description: "HTTP methods a generated key is limited to (subset of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS). Omit or leave empty for unrestricted.",
+				Description: "Upper-case HTTP methods a minted token is limited to (subset of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS). Omit or leave empty for unrestricted.",
 				ElementType: types.StringType,
 				Optional:    true,
 				Validators: []validator.Set{
@@ -78,11 +78,11 @@ func (r *secretBackendRoleResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"ttl": schema.Int64Attribute{
-				Description: "Default lease TTL in seconds for keys generated from this role.",
+				Description: "Default lease TTL in seconds for tokens minted from this role.",
 				Optional:    true,
 			},
 			"max_ttl": schema.Int64Attribute{
-				Description: "Maximum lease TTL in seconds for keys generated from this role.",
+				Description: "Maximum lease TTL in seconds for tokens minted from this role.",
 				Optional:    true,
 			},
 		},

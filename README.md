@@ -1,95 +1,74 @@
-# terraform-provider-vault-secrets-arrstack
+# Terraform Provider for the arrstack Vault secrets engine
 
-A Terraform/OpenTofu provider that manages the **arrstack dynamic secrets engine**
-([`vault-plugin-secrets-arrstack`](https://git.unkin.net/unkin/vault-plugin-secrets-arrstack))
-on HashiCorp Vault or OpenBao, so the engine's mount, config, and roles can be
-driven declaratively (e.g. from `terraform-vault`). The engine mints short-lived
-arrproxy API keys scoped to the arr apps (Sonarr, Radarr, Prowlarr).
+This provider manages the arrstack secrets engine
+([vault-plugin-secrets-arrstack](https://github.com/IUCLabs/vault-plugin-secrets-arrstack))
+on HashiCorp Vault or OpenBao: the engine's mount, its arrproxy connection
+config, and its roles. The engine mints short-lived arrproxy machine tokens
+scoped to Sonarr, Radarr, and Prowlarr.
 
-Source address: `artifactapi.k8s.syd1.au.unkin.net/terraform-unkin/vault-secrets-arrstack`
-(declare it under the local name `arrstack`, so its resources are `arrstack_*`).
+Works with Terraform and OpenTofu.
 
-## Resources
+- [Provider documentation](docs/index.md)
+- [`arrstack_secret_backend`](docs/resources/secret_backend.md)
+- [`arrstack_secret_backend_role`](docs/resources/secret_backend_role.md)
 
-| Resource | Manages |
-|----------|---------|
-| `arrstack_secret_backend` | Mounts the engine at a path and writes its `config` (arrproxy base URL, request timeout, seeded admin token, optional CA cert). |
-| `arrstack_secret_backend_role` | A role: `apps` (subset of sonarr/radarr/prowlarr), optional `methods` (HTTP method scope), `ttl`, `max_ttl`. |
+## Requirements
+
+- Terraform 1.0+ or OpenTofu 1.6+
+- Vault 1.12+ or OpenBao 2.x with
+  [vault-plugin-secrets-arrstack](https://github.com/IUCLabs/vault-plugin-secrets-arrstack)
+  registered in the plugin catalog (0.2.0+ for `methods`)
+- Go 1.25+ to build from source
 
 ## Usage
+
+Prebuilt provider archives are on the [releases page](https://github.com/IUCLabs/terraform-provider-vault-secrets-arrstack/releases).
+
+The registry type is `vault-secrets-arrstack`; declare it under the local name
+`arrstack` so its resources are `arrstack_*`.
 
 ```hcl
 terraform {
   required_providers {
     arrstack = {
-      source  = "artifactapi.k8s.syd1.au.unkin.net/terraform-unkin/vault-secrets-arrstack"
-      version = "0.1.0"
+      source = "IUCLabs/vault-secrets-arrstack"
     }
   }
 }
 
-provider "arrstack" {
-  # address / token fall back to VAULT_ADDR / VAULT_TOKEN.
-}
+# address and token fall back to VAULT_ADDR and VAULT_TOKEN.
+provider "arrstack" {}
 
 resource "arrstack_secret_backend" "arrstack" {
   path        = "arrstack"
-  base_url    = "https://arrstack.unkin.net"
+  base_url    = "https://arrproxy.example.com"
   admin_token = var.arrproxy_admin_token
 }
 
-resource "arrstack_secret_backend_role" "all" {
-  backend = arrstack_secret_backend.arrstack.path
-  name    = "all"
-  apps    = ["sonarr", "radarr", "prowlarr"]
-  ttl     = 60
-  max_ttl = 86400
-}
-
-# Read-only role: keys minted from it may only issue GET/HEAD.
 resource "arrstack_secret_backend_role" "sonarr_ro" {
   backend = arrstack_secret_backend.arrstack.path
   name    = "sonarr-ro"
   apps    = ["sonarr"]
   methods = ["GET", "HEAD"]
-  ttl     = 60
+  ttl     = 3600
   max_ttl = 86400
 }
 ```
 
-### Notes
-
-- `admin_token` is write-only: Vault never returns it, so it is preserved in
-  Terraform state and does not show drift. `ca_cert` is likewise write-only and
-  preserved; omit it to use the system trust store.
-- Writing `config` makes the engine authenticate against arrproxy as an admin,
-  so a bad URL or token fails the apply.
-- `apps` is required; entries must be a subset of `sonarr`, `radarr`, `prowlarr`.
-- `methods` is optional and restricts a minted key to those HTTP methods;
-  omitting it (or setting `[]`) leaves the key unrestricted. Entries must be
-  upper case and a subset of `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`,
-  `OPTIONS` — the engine stores them upper-cased, so a lower-case value would
-  show permanent drift and is rejected at plan time. Requires engine plugin
-  `vault-plugin-secrets-arrstack` >= 0.2.0.
-
-## Import
-
-```sh
-terraform import arrstack_secret_backend.arrstack arrstack
-terraform import arrstack_secret_backend_role.all arrstack/roles/all
-```
+Tokens are then minted with `vault read arrstack/creds/sonarr-ro`.
 
 ## Development
 
 ```sh
-make build      # build the provider binary
-make install    # install into ~/.terraform.d/plugins for local use
-make test       # unit tests (race)
-make package    # build the release zip
+make build   # build the provider binary
+make test    # unit tests
+make lint    # go vet
+make docs    # regenerate docs/ with tfplugindocs
 ```
 
-Releases are tag-driven (`make patch|minor|major`): a Woodpecker pipeline builds
-`terraform-provider-vault-secrets-arrstack_<version>_linux_amd64.zip` and PUTs it
-to the artifactapi terraform registry
-(`.../api/v2/remotes/terraform-unkin/files/terraform-unkin/vault-secrets-arrstack/<file>`),
-which signs it server-side. Install it via the bare `source` address above.
+`make install` copies the binary into `~/.terraform.d/plugins` for local
+testing.
+
+## License
+
+[MIT](LICENSE)

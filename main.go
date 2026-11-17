@@ -1,8 +1,10 @@
 // Command terraform-provider-vault-secrets-arrstack is the Terraform/OpenTofu
 // provider for the vault-plugin-secrets-arrstack secrets engine: it manages the
-// engine's mount + connection config and its arrproxy API-key roles on
+// engine's mount + connection config and its roles on
 // HashiCorp Vault or OpenBao.
 package main
+
+//go:generate go tool tfplugindocs generate --provider-name arrstack
 
 import (
 	"context"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"git.unkin.net/unkin/terraform-provider-vault-secrets-arrstack/internal/provider"
+	"github.com/IUCLabs/terraform-provider-vault-secrets-arrstack/internal/provider"
 )
 
 var version = "0.0.1"
@@ -22,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "artifactapi.k8s.syd1.au.unkin.net/terraform-unkin/vault-secrets-arrstack",
+		Address: "registry.terraform.io/iuclabs/vault-secrets-arrstack",
 		Debug:   debug,
 	}
 

@@ -29,16 +29,15 @@ func New(version string) func() provider.Provider {
 }
 
 func (p *arrstackProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	// Source address is artifactapi.k8s.syd1.au.unkin.net/terraform-unkin/vault-secrets-arrstack,
-	// but resources are prefixed "arrstack_" (declare it in required_providers
-	// under the local name "arrstack").
+	// Registry type is vault-secrets-arrstack; declare it under the local name "arrstack".
 	resp.TypeName = "arrstack"
 	resp.Version = p.version
 }
 
 func (p *arrstackProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage the arrstack dynamic secrets engine (config and roles) on HashiCorp Vault or OpenBao.",
+		Description:         "Manages the arrstack secrets engine (vault-plugin-secrets-arrstack) on HashiCorp Vault or OpenBao: its mount, arrproxy connection config, and roles.",
+		MarkdownDescription: "Manages the arrstack secrets engine ([vault-plugin-secrets-arrstack](https://github.com/IUCLabs/vault-plugin-secrets-arrstack)) on HashiCorp Vault or OpenBao: its mount, arrproxy connection config, and roles. The engine mints short-lived arrproxy machine tokens scoped to Sonarr, Radarr, and Prowlarr.",
 		Attributes: map[string]schema.Attribute{
 			"address": schema.StringAttribute{
 				Description: "Address of the Vault/OpenBao server. Falls back to the VAULT_ADDR environment variable.",
